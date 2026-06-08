@@ -35,8 +35,9 @@ function syncCalendars() {
       continue;
     }
 
-    const targetIsOrganizer = isTargetOrganizer(event);
-    const targetIsGuest = isTargetInvited(event);
+    const targetRole = getTargetRole(event);
+    const targetIsOrganizer = targetRole === "organizer";
+    const targetIsGuest = targetRole === "guest";
     const existing = placeholderMap[sourceEventId];
 
     if (targetIsOrganizer) {
@@ -172,19 +173,18 @@ function removeAllPlaceholders() {
 // Helpers
 // ============================================================
 
-function isTargetOrganizer(event) {
+function getTargetRole(event) {
   try {
-    return event.getCreators().some(c => c.toLowerCase() === CONFIG.TARGET_EMAIL.toLowerCase());
+    const details = Calendar.Events.get(CONFIG.SOURCE_CAL_ID, event.getId());
+    const target = CONFIG.TARGET_EMAIL.toLowerCase();
+    const creator = (details.creator && details.creator.email || "").toLowerCase();
+    const organizer = (details.organizer && details.organizer.email || "").toLowerCase();
+    if (creator === target || organizer === target) return "organizer";
+    const isAttendee = (details.attendees || []).some(a => (a.email || "").toLowerCase() === target);
+    if (isAttendee) return "guest";
+    return "none";
   } catch (e) {
-    return false;
-  }
-}
-
-function isTargetInvited(event) {
-  try {
-    return event.getGuestList().some(g => g.getEmail().toLowerCase() === CONFIG.TARGET_EMAIL.toLowerCase());
-  } catch (e) {
-    return false;
+    return "none";
   }
 }
 

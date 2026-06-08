@@ -117,8 +117,9 @@ clasp open
 
 In the Apps Script editor:
 
-1. Select the `setup` function from the function dropdown.
-2. Click **Run**.
+1. Enable the **Advanced Calendar Service**: click the **Services** (＋) icon in the left panel, find **Google Calendar API**, and click **Add**.
+2. Select the `setup` function from the function dropdown.
+3. Click **Run**.
 3. Accept the permission prompts (the script needs access to Google Calendar).
 4. Check the **Execution log** — you should see both calendars confirmed and a trigger created.
 
@@ -158,6 +159,9 @@ Run `syncCalendars()` manually and check the **Execution log** for errors. Also 
 
 **Duplicate placeholders**
 Run `removeAllPlaceholders()` to reset, then run `syncCalendars()` to rebuild from scratch.
+
+**Placeholders created for events you organized**
+The script uses the Advanced Calendar Service to detect if the target account is the creator or organizer of a source event. If this service is not enabled, the check silently fails and placeholders are created anyway. Enable it via **Services (＋) → Google Calendar API** in the Apps Script editor.
 
 **Trigger not firing**
 Go to the Apps Script editor → **Triggers** (clock icon on the left). If no trigger exists, run `setup()` again.
