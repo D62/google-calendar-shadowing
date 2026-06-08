@@ -1,0 +1,6 @@
+# Personal configuration — never commit these
+.clasp.json
+Config.js
+
+# Node (if you install clasp locally)
+node_modules/
