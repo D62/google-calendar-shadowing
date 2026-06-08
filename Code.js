@@ -17,7 +17,16 @@ function syncCalendars() {
 
   const sourceEvents = getSourceCalendarEvents(now, end);
   const targetCal = CalendarApp.getCalendarById(CONFIG.TARGET_CAL_ID);
-  const existingPlaceholders = getExistingPlaceholders(targetCal, now, end);
+
+  // Split the target calendar into our placeholders vs. the user's real events.
+  // The source calendar is shared as free/busy only, so we cannot read its
+  // organizer/guest details. Instead we detect "the target is already busy for
+  // this event" by checking whether a native (non-placeholder) target event
+  // already occupies the same time slot — which is exactly what happens when the
+  // target account is the organizer or a guest of the source event.
+  const targetEvents = targetCal.getEvents(now, end);
+  const existingPlaceholders = targetEvents.filter(isPlaceholder);
+  const nativeEvents = targetEvents.filter(e => !isPlaceholder(e));
 
   const placeholderMap = {};
   existingPlaceholders.forEach(e => {
@@ -35,19 +44,16 @@ function syncCalendars() {
       continue;
     }
 
-    const targetRole = getTargetRole(event);
-    const targetIsOrganizer = targetRole === "organizer";
-    const targetIsGuest = targetRole === "guest";
     const existing = placeholderMap[sourceEventId];
 
-    if (targetIsOrganizer) {
-      // Event was created by the target account — already in target cal natively.
-      // Clean up any stale placeholder if one exists.
+    if (hasMatchingNativeEvent(nativeEvents, event)) {
+      // Target is already busy at this exact time via a real event (organizer or
+      // guest) — no placeholder needed. Remove any stale placeholder.
       if (existing) {
         try {
           existing.deleteEvent();
           deleted++;
-          Logger.log(`Removed duplicate (target is organizer): ${event.getTitle()}`);
+          Logger.log(`Removed duplicate (target already busy): ${event.getStartTime()}`);
         } catch (e) {
           Logger.log(`Error removing duplicate: ${e.message}`);
         }
@@ -57,24 +63,7 @@ function syncCalendars() {
       continue;
     }
 
-    if (targetIsGuest) {
-      // Target account is already a guest — no placeholder needed.
-      if (existing) {
-        // Target was added as guest after placeholder was created — remove duplicate.
-        try {
-          existing.deleteEvent();
-          deleted++;
-          Logger.log(`Removed duplicate (target now guest): ${event.getTitle()}`);
-        } catch (e) {
-          Logger.log(`Error removing duplicate: ${e.message}`);
-        }
-      } else {
-        skipped++;
-      }
-      continue;
-    }
-
-    // Target is NOT a guest — placeholder needed.
+    // Target is free at this time — placeholder needed.
     if (!existing) {
       try {
         const placeholder = targetCal.createEvent(
@@ -173,19 +162,20 @@ function removeAllPlaceholders() {
 // Helpers
 // ============================================================
 
-function getTargetRole(event) {
-  try {
-    const details = Calendar.Events.get(CONFIG.SOURCE_CAL_ID, event.getId());
-    const target = CONFIG.TARGET_EMAIL.toLowerCase();
-    const creator = (details.creator && details.creator.email || "").toLowerCase();
-    const organizer = (details.organizer && details.organizer.email || "").toLowerCase();
-    if (creator === target || organizer === target) return "organizer";
-    const isAttendee = (details.attendees || []).some(a => (a.email || "").toLowerCase() === target);
-    if (isAttendee) return "guest";
-    return "none";
-  } catch (e) {
-    return "none";
-  }
+function isPlaceholder(event) {
+  return (event.getDescription() || "").includes(CONFIG.SYNC_TAG);
+}
+
+// True when the target calendar already has a real (non-placeholder) event at
+// the exact same start/end as the source event. This is how an event where the
+// target is the organizer or a guest shows up natively, so no placeholder is
+// needed for it.
+function hasMatchingNativeEvent(nativeEvents, sourceEvent) {
+  const start = sourceEvent.getStartTime().getTime();
+  const end = sourceEvent.getEndTime().getTime();
+  return nativeEvents.some(n =>
+    n.getStartTime().getTime() === start && n.getEndTime().getTime() === end
+  );
 }
 
 function getSourceCalendarEvents(start, end) {
@@ -203,8 +193,7 @@ function getSourceCalendarEvents(start, end) {
 }
 
 function getExistingPlaceholders(targetCal, start, end) {
-  return targetCal.getEvents(start, end)
-    .filter(e => (e.getDescription() || "").includes(CONFIG.SYNC_TAG));
+  return targetCal.getEvents(start, end).filter(isPlaceholder);
 }
 
 function extractSourceId(placeholderEvent) {

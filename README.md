@@ -79,7 +79,9 @@ In [Google Calendar](https://calendar.google.com), go to **Settings → [calenda
 The source calendar must be shared with the Google account that will run this script:
 
 1. In Google Calendar, open the source calendar settings.
-2. Under **Share with specific people**, add the target account email with **"See all event details"** permission.
+2. Under **Share with specific people**, add the target account email. **"See only free/busy (hide details)"** is enough — the script only needs event times, not details. (**"See all event details"** also works.)
+
+The script never copies titles, guests, or descriptions, so free/busy sharing keeps your source events fully private.
 
 #### Color reference
 
@@ -117,9 +119,8 @@ clasp open
 
 In the Apps Script editor:
 
-1. Enable the **Advanced Calendar Service**: click the **Services** (＋) icon in the left panel, find **Google Calendar API**, and click **Add**.
-2. Select the `setup` function from the function dropdown.
-3. Click **Run**.
+1. Select the `setup` function from the function dropdown.
+2. Click **Run**.
 3. Accept the permission prompts (the script needs access to Google Calendar).
 4. Check the **Execution log** — you should see both calendars confirmed and a trigger created.
 
@@ -160,8 +161,8 @@ Run `syncCalendars()` manually and check the **Execution log** for errors. Also 
 **Duplicate placeholders**
 Run `removeAllPlaceholders()` to reset, then run `syncCalendars()` to rebuild from scratch.
 
-**Placeholders created for events you organized**
-The script uses the Advanced Calendar Service to detect if the target account is the creator or organizer of a source event. If this service is not enabled, the check silently fails and placeholders are created anyway. Enable it via **Services (＋) → Google Calendar API** in the Apps Script editor.
+**Placeholders created for events you organized or were invited to**
+The script avoids these by checking whether the target calendar already has a real (non-placeholder) event at the exact same start/end time — which is the case when the target account is the organizer or a guest. If you still see duplicates, the native event's times differ slightly from the source (e.g. a modified recurring instance); run `removeAllPlaceholders()` then `syncCalendars()` to rebuild.
 
 **Trigger not firing**
 Go to the Apps Script editor → **Triggers** (clock icon on the left). If no trigger exists, run `setup()` again.
